@@ -53,26 +53,28 @@ object Lambda {
     Apply(selfApp(f), selfApp(f))
   def yf = Y(Var("f")).toString
 
-  def eval(expr: Expression, env: Environment) : Value = {
+  def eval(steps: BigInt, expr: Expression, env: Environment) : Value = {
+    if (steps < 0) Err("Too many steps") else {
       expr match {
         case Const(c) => IntegerValue(c)
         case Var(s) => env.m(s) match {
             case Some(v) => v
             case None() => Err("Unknown variable " + s + ".") }
-        case If(cond, thenB, elseB) => eval(cond, env) match {
-          case IntegerValue(0) => eval(elseB, env)
-          case IntegerValue(_) => eval(thenB, env)
+        case If(cond, thenB, elseB) => eval(steps - 1, cond, env) match {
+          case IntegerValue(0) => eval(steps - 1, elseB, env)
+          case IntegerValue(_) => eval(steps - 1, thenB, env)
           case _ => Err("Condition of if not an integer.")
         }
-        case Apply(fexpr, arg) => eval(fexpr, env) match {
-            case FunctionValue(f) => f(eval(arg, env))
+        case Apply(fexpr, arg) => eval(steps - 1, fexpr, env) match {
+            case FunctionValue(f) => f(eval(steps - 1, arg, env))
             case _ => Err("Application of " + fexpr.toString +
                           " evaluated to value that is not a function.")
         }
         case Lambda(bv, body) => FunctionValue(
-            (v: Value) => eval(body, env.update(bv, v))
+            (v: Value) => eval(steps - 1, body, env.update(bv, v))
         )
       }
+    }
   }
 
   def lift(op: (Int, Int) => Int) : Value = FunctionValue((v1: Value) => v1 match {
@@ -95,7 +97,7 @@ object Lambda {
     Apply(Apply(Var("*"), Const(3)), Var("x")))
 
   def expr3x8: Expression = Apply(mul3, Const(8))
-  def res3x8: Value = eval(expr3x8, stdEnv)
+  def res3x8: Value = eval(100, expr3x8, stdEnv)
 
   def absExpr: Expression = Lambda("x",
     If(Apply(Apply(Var("<"), Const(0)), Var("x")),
@@ -105,5 +107,5 @@ object Lambda {
   )
   def absEx1: Expression = Apply(absExpr, Const(-65))
   def absEx2: Expression = Apply(absExpr, Const(-7))
-  def absExRes = eval(absEx2, stdEnv)
+  def absExRes = eval(100, absEx2, stdEnv)
 }
